@@ -317,27 +317,22 @@ if uploaded_file is not None:
     st.dataframe(results_df, use_container_width=True)
 
     st.subheader("解釈メモ")
-    st.markdown(f"**主に確認しやすい検定:** `{primary_test}`")
-
-    shapiro_ok = (
-        pd.notna(shapiro1) and pd.notna(shapiro2)
-        and shapiro1 >= alpha and shapiro2 >= alpha
-    )
-    levene_ok = pd.notna(levene_p) and levene_p >= alpha
+    st.markdown(f"**推奨される検定:** `{primary_test}`")
 
     if shapiro_ok and levene_ok:
         st.info(
             "両群とも正規性を棄却する十分な根拠がなく、等分散性も棄却する十分な根拠がないため、"
-            "主には Student t-test を確認しやすい状況です。"
+            "この場合は Student t-test が第一候補です。"
         )
     elif shapiro_ok and not levene_ok:
         st.info(
             "両群とも正規性を棄却する十分な根拠はありませんが、等分散性は仮定しにくいため、"
-            "主には Welch t-test を確認しやすい状況です。"
+            "この場合は Welch t-test が第一候補です。"
         )
     else:
         st.info(
-            "正規性を仮定しにくい可能性があるため、主には Mann-Whitney U を確認しやすい状況です。"
+            "正規性を仮定しにくい可能性があるため、"
+            "この場合は Mann-Whitney U が第一候補です。"
         )
 
     st.caption(
