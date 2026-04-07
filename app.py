@@ -13,9 +13,8 @@ SAMPLE_WIDE_CSV = """group_A,group_B
 12.3,10.2
 11.8,9.8
 13.1,10.9
-,11.1
+12.2,11.1
 """
-
 
 def load_csv_flex(uploaded_file):
     """UTF-8 / UTF-8-SIG / CP932 を順に試してCSVを読む"""
