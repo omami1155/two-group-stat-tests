@@ -234,13 +234,11 @@ def run_tests(x, y, alpha=0.05):
 
 
 st.sidebar.header("設定")
-alpha = st.sidebar.number_input(
+alpha = st.sidebar.selectbox(
     "有意水準 α",
-    min_value=0.001,
-    max_value=0.20,
-    value=ALPHA_DEFAULT,
-    step=0.001,
-    format="%.3f",
+    options=[0.01, 0.05, 0.10],
+    index=1,
+    format_func=lambda x: f"{x:.2f}",
 )
 
 st.sidebar.download_button(
