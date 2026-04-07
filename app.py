@@ -53,32 +53,31 @@ def summarize(x, name):
     }
 
 
-def add_result(results, category, test_name, statistic, pvalue, alpha, interpretation, note="", primary=False):
+def add_result(results, category, test_name, pvalue, alpha, interpretation, note="", primary=False):
     results.append({
         "区分": category,
         "検定": test_name,
-        "統計量": statistic,
         "p値": pvalue,
         "α": alpha,
-        "第一候補": "○" if primary else "",
+        "推奨": "○" if primary else "",
         "解釈": interpretation,
-        "備考": note,
+        "備考": note if note else "特記事項なし",
     })
 
 
 def safe_shapiro(x):
     x = pd.Series(x).dropna()
     if len(x) < 3:
-        return np.nan, np.nan, "n<3のため実行不可"
+        return np.nan, "n<3のため実行不可"
     if len(x) > 5000:
-        return np.nan, np.nan, "n>5000のため Shapiro-Wilk は実行対象外（別法の検討推奨）"
+        return np.nan, "n>5000のため Shapiro-Wilk は実行対象外（別法の検討推奨）"
     if x.nunique() < 2:
-        return np.nan, np.nan, "値のばらつきがほとんどないため実行不可"
+        return np.nan, "値のばらつきがほとんどないため実行不可"
     try:
         res = stats.shapiro(x)
-        return float(res.statistic), float(res.pvalue), ""
+        return float(res.pvalue), ""
     except Exception as e:
-        return np.nan, np.nan, f"実行不可: {e}"
+        return np.nan, f"実行不可: {e}"
 
 
 def interpret_shapiro(p, alpha):
@@ -132,32 +131,31 @@ def run_tests(x, y, alpha=0.05):
 
     results = []
 
-    sx_stat, sx_p, sx_note = safe_shapiro(x)
-    sy_stat, sy_p, sy_note = safe_shapiro(y)
+    sx_p, sx_note = safe_shapiro(x)
+    sy_p, sy_note = safe_shapiro(y)
 
     add_result(
         results, "前提確認", "Shapiro-Wilk（群1）",
-        sx_stat, sx_p, alpha, interpret_shapiro(sx_p, alpha), sx_note
+        sx_p, alpha, interpret_shapiro(sx_p, alpha), sx_note
     )
     add_result(
         results, "前提確認", "Shapiro-Wilk（群2）",
-        sy_stat, sy_p, alpha, interpret_shapiro(sy_p, alpha), sy_note
+        sy_p, alpha, interpret_shapiro(sy_p, alpha), sy_note
     )
 
     if len(x) >= 2 and len(y) >= 2 and x.nunique() >= 2 and y.nunique() >= 2:
         try:
             lev = stats.levene(x, y, center="median")
-            lev_stat = float(lev.statistic)
             lev_p = float(lev.pvalue)
             lev_note = ""
         except Exception as e:
-            lev_stat, lev_p, lev_note = np.nan, np.nan, f"実行不可: {e}"
+            lev_p, lev_note = np.nan, f"実行不可: {e}"
     else:
-        lev_stat, lev_p, lev_note = np.nan, np.nan, "各群 n>=2 かつ一定値のみでないことが必要"
+        lev_p, lev_note = np.nan, "各群 n>=2 かつ一定値のみでないことが必要"
 
     add_result(
         results, "前提確認", "Levene",
-        lev_stat, lev_p, alpha, interpret_levene(lev_p, alpha), lev_note
+        lev_p, alpha, interpret_levene(lev_p, alpha), lev_note
     )
 
     primary_test = choose_primary_test(x, y, sx_p, sy_p, lev_p, alpha)
@@ -169,20 +167,20 @@ def run_tests(x, y, alpha=0.05):
             )
             add_result(
                 results, "群比較", "Student t-test",
-                float(t_student.statistic), float(t_student.pvalue), alpha,
+                float(t_student.pvalue), alpha,
                 interpret_difference(float(t_student.pvalue), alpha),
                 primary=(primary_test == "Student t-test")
             )
         except Exception as e:
             add_result(
                 results, "群比較", "Student t-test",
-                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                np.nan, alpha, "判定不可", f"実行不可: {e}",
                 primary=(primary_test == "Student t-test")
             )
     else:
         add_result(
             results, "群比較", "Student t-test",
-            np.nan, np.nan, alpha, "判定不可", "各群 n>=2 が必要",
+            np.nan, alpha, "判定不可", "各群 n>=2 が必要",
             primary=(primary_test == "Student t-test")
         )
 
@@ -193,20 +191,20 @@ def run_tests(x, y, alpha=0.05):
             )
             add_result(
                 results, "群比較", "Welch t-test",
-                float(t_welch.statistic), float(t_welch.pvalue), alpha,
+                float(t_welch.pvalue), alpha,
                 interpret_difference(float(t_welch.pvalue), alpha),
                 primary=(primary_test == "Welch t-test")
             )
         except Exception as e:
             add_result(
                 results, "群比較", "Welch t-test",
-                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                np.nan, alpha, "判定不可", f"実行不可: {e}",
                 primary=(primary_test == "Welch t-test")
             )
     else:
         add_result(
             results, "群比較", "Welch t-test",
-            np.nan, np.nan, alpha, "判定不可", "各群 n>=2 が必要",
+            np.nan, alpha, "判定不可", "各群 n>=2 が必要",
             primary=(primary_test == "Welch t-test")
         )
 
@@ -215,20 +213,20 @@ def run_tests(x, y, alpha=0.05):
             mw = stats.mannwhitneyu(x, y, alternative="two-sided", method="auto")
             add_result(
                 results, "群比較", "Mann-Whitney U",
-                float(mw.statistic), float(mw.pvalue), alpha,
+                float(mw.pvalue), alpha,
                 interpret_difference(float(mw.pvalue), alpha),
                 primary=(primary_test == "Mann-Whitney U")
             )
         except Exception as e:
             add_result(
                 results, "群比較", "Mann-Whitney U",
-                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                np.nan, alpha, "判定不可", f"実行不可: {e}",
                 primary=(primary_test == "Mann-Whitney U")
             )
     else:
         add_result(
             results, "群比較", "Mann-Whitney U",
-            np.nan, np.nan, alpha, "判定不可", "各群 n>=1 が必要",
+            np.nan, alpha, "判定不可", "各群 n>=1 が必要",
             primary=(primary_test == "Mann-Whitney U")
         )
 
@@ -315,7 +313,6 @@ if uploaded_file is not None:
     st.dataframe(results_df, use_container_width=True)
 
     st.subheader("解釈メモ")
-    st.markdown(f"**推奨される検定:** `{primary_test}`")
 
     shapiro_ok = (
         pd.notna(shapiro1) and pd.notna(shapiro2)
