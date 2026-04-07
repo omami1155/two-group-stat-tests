@@ -40,15 +40,15 @@ def summarize(x, name):
     q1 = x.quantile(0.25) if len(x) > 0 else np.nan
     q3 = x.quantile(0.75) if len(x) > 0 else np.nan
     return {
-        "group": name,
-        "n": int(x.shape[0]),
-        "mean": float(x.mean()) if len(x) else np.nan,
-        "sd": float(x.std(ddof=1)) if len(x) >= 2 else np.nan,
-        "median": float(x.median()) if len(x) else np.nan,
+        "グループ": name,
+        "n数": int(x.shape[0]),
+        "平均": float(x.mean()) if len(x) else np.nan,
+        "標準偏差": float(x.std(ddof=1)) if len(x) >= 2 else np.nan,
+        "中央値": float(x.median()) if len(x) else np.nan,
         "Q1": float(q1) if len(x) else np.nan,
         "Q3": float(q3) if len(x) else np.nan,
-        "min": float(x.min()) if len(x) else np.nan,
-        "max": float(x.max()) if len(x) else np.nan,
+        "最少値": float(x.min()) if len(x) else np.nan,
+        "最大値": float(x.max()) if len(x) else np.nan,
     }
 
 
