@@ -9,12 +9,18 @@ st.title("2群比較 統計検定アプリ")
 st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を一括実行")
 
 ALPHA_DEFAULT = 0.05
+SAMPLE_WIDE_CSV = """group_A,group_B
+12.3,10.2
+11.8,9.8
+13.1,10.9
+,11.1
+"""
 
 
 def load_csv_flex(uploaded_file):
     """UTF-8 / UTF-8-SIG / CP932 を順に試してCSVを読む"""
     raw = uploaded_file.getvalue()
-    encodings = ["utf-8", "utf-8-sig", "cp932", "latin1"]
+    encodings = ["utf-8", "utf-8-sig", "cp932"]
     last_error = None
 
     for enc in encodings:
@@ -120,6 +126,17 @@ alpha = st.sidebar.number_input(
     format="%.3f",
 )
 
+st.sidebar.download_button(
+    label="サンプルCSVをダウンロード",
+    data=SAMPLE_WIDE_CSV.encode("utf-8-sig"),
+    file_name="sample_wide.csv",
+    mime="text/csv",
+)
+
+with st.expander("CSV形式の例", expanded=True):
+    st.markdown("2列以上の数値列を持つCSVをアップロードしてください。比較は2列を選択して行います。")
+    st.code(SAMPLE_WIDE_CSV, language="csv")
+
 uploaded_file = st.file_uploader("CSVファイルをアップロード", type=["csv"])
 
 if uploaded_file is not None:
@@ -129,63 +146,36 @@ if uploaded_file is not None:
         st.error(f"CSVの読み込みに失敗しました: {e}")
         st.stop()
 
+    if df.shape[1] < 2:
+        st.error("列が2本以上必要です。")
+        st.stop()
+
     st.subheader("読み込んだデータ")
     st.dataframe(df.head(20), use_container_width=True)
 
-    mode = st.radio(
-        "データ形式を選択",
-        ["long形式（群列1本＋値列1本）", "wide形式（各群が別列）"],
-        horizontal=True,
-    )
+    candidate_cols = df.columns.tolist()
+    col1, col2 = st.columns(2)
+    with col1:
+        col_x = st.selectbox("群1の列", candidate_cols, index=0)
+    with col2:
+        col_y = st.selectbox("群2の列", candidate_cols, index=1)
 
-    if mode.startswith("long"):
-        st.markdown("**想定例**: `group,value`")
-        cols = df.columns.tolist()
+    if col_x == col_y:
+        st.warning("異なる2列を選んでください。")
+        st.stop()
 
-        col1, col2 = st.columns(2)
-        with col1:
-            group_col = st.selectbox("群ラベル列", cols, index=0 if len(cols) > 0 else None)
-        with col2:
-            value_col = st.selectbox("数値列", cols, index=1 if len(cols) > 1 else 0)
+    x_raw = df[col_x]
+    y_raw = df[col_y]
+    x = to_numeric_series(x_raw)
+    y = to_numeric_series(y_raw)
 
-        groups = df[group_col].dropna().astype(str).unique().tolist()
-
-        if len(groups) < 2:
-            st.error("群が2つ未満です。2群比較ができません。")
-            st.stop()
-
-        selected_groups = st.multiselect("比較する2群を選択", groups, default=groups[:2])
-
-        if len(selected_groups) != 2:
-            st.warning("比較する群をちょうど2つ選んでください。")
-            st.stop()
-
-        g1, g2 = selected_groups
-        x = to_numeric_series(df.loc[df[group_col].astype(str) == g1, value_col])
-        y = to_numeric_series(df.loc[df[group_col].astype(str) == g2, value_col])
-        name1, name2 = g1, g2
-
-    else:
-        st.markdown("**想定例**: `group_A,group_B`")
-        candidate_cols = df.columns.tolist()
-
-        col1, col2 = st.columns(2)
-        with col1:
-            col_x = st.selectbox("群1の列", candidate_cols, index=0 if len(candidate_cols) > 0 else None)
-        with col2:
-            default_index = 1 if len(candidate_cols) > 1 else 0
-            col_y = st.selectbox("群2の列", candidate_cols, index=default_index)
-
-        if col_x == col_y:
-            st.warning("異なる2列を選んでください。")
-            st.stop()
-
-        x = to_numeric_series(df[col_x])
-        y = to_numeric_series(df[col_y])
-        name1, name2 = col_x, col_y
+    dropped_x = int(x_raw.notna().sum() - len(x))
+    dropped_y = int(y_raw.notna().sum() - len(y))
+    if dropped_x > 0 or dropped_y > 0:
+        st.warning(f"数値変換できない値を除外しました（群1: {dropped_x}件, 群2: {dropped_y}件）。")
 
     st.subheader("記述統計")
-    summary_df = pd.DataFrame([summarize(x, name1), summarize(y, name2)])
+    summary_df = pd.DataFrame([summarize(x, col_x), summarize(y, col_y)])
     st.dataframe(summary_df, use_container_width=True)
 
     if len(x) == 0 or len(y) == 0:
