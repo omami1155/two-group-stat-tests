@@ -4,9 +4,10 @@ import pandas as pd
 import streamlit as st
 from scipy import stats
 
-st.set_page_config(page_title="2群比較まとめ", layout="wide")
-st.title("2群比較 統計検定アプリ")
-st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を一括実行")
+st.set_page_config(page_title="独立2群比較まとめ", layout="wide")
+st.title("独立2群比較 統計検定アプリ")
+st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を実行")
+st.warning("このアプリは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
 
 ALPHA_DEFAULT = 0.05
 SAMPLE_WIDE_CSV = """group_A,group_B
@@ -40,32 +41,28 @@ def summarize(x, name):
     q1 = x.quantile(0.25) if len(x) > 0 else np.nan
     q3 = x.quantile(0.75) if len(x) > 0 else np.nan
     return {
-        "群": name,
+        "グループ": name,
         "n数": int(x.shape[0]),
         "平均": float(x.mean()) if len(x) else np.nan,
         "標準偏差": float(x.std(ddof=1)) if len(x) >= 2 else np.nan,
         "最少値": float(x.min()) if len(x) else np.nan,
         "Q1": float(q1) if len(x) else np.nan,
-        "Q2": float(x.median()) if len(x) else np.nan,
+        "中央値": float(x.median()) if len(x) else np.nan,
         "Q3": float(q3) if len(x) else np.nan,
         "最大値": float(x.max()) if len(x) else np.nan,
     }
 
 
-def decision_text(p, alpha):
-    if pd.isna(p):
-        return "判定不可"
-    return "有意差あり" if p < alpha else "有意差なし"
-
-
-def add_result(results, test_name, statistic, pvalue, alpha, note=""):
+def add_result(results, category, test_name, statistic, pvalue, alpha, interpretation, note="", primary=False):
     results.append({
-        "test": test_name,
-        "statistic": statistic,
-        "p_value": pvalue,
-        "alpha": alpha,
-        "decision": decision_text(pvalue, alpha),
-        "note": note,
+        "区分": category,
+        "検定": test_name,
+        "統計量": statistic,
+        "p値": pvalue,
+        "α": alpha,
+        "主に確認": "○" if primary else "",
+        "解釈": interpretation,
+        "備考": note,
     })
 
 
@@ -73,8 +70,60 @@ def safe_shapiro(x):
     x = pd.Series(x).dropna()
     if len(x) < 3:
         return np.nan, np.nan, "n<3のため実行不可"
-    res = stats.shapiro(x)
-    return float(res.statistic), float(res.pvalue), ""
+    if len(x) > 5000:
+        return np.nan, np.nan, "n>5000のため Shapiro-Wilk は実行対象外（別法の検討推奨）"
+    if x.nunique() < 2:
+        return np.nan, np.nan, "値のばらつきがほとんどないため実行不可"
+    try:
+        res = stats.shapiro(x)
+        return float(res.statistic), float(res.pvalue), ""
+    except Exception as e:
+        return np.nan, np.nan, f"実行不可: {e}"
+
+
+def interpret_shapiro(p, alpha):
+    if pd.isna(p):
+        return "判定不可"
+    if p < alpha:
+        return "正規性を仮定しにくい"
+    return "正規性を棄却する十分な根拠なし"
+
+
+def interpret_levene(p, alpha):
+    if pd.isna(p):
+        return "判定不可"
+    if p < alpha:
+        return "等分散を仮定しにくい"
+    return "等分散を棄却する十分な根拠なし"
+
+
+def interpret_difference(p, alpha):
+    if pd.isna(p):
+        return "判定不可"
+    if p < alpha:
+        return "群間差あり"
+    return "群間差を示す十分な根拠なし"
+
+
+def choose_primary_test(x, y, shapiro1_p, shapiro2_p, levene_p, alpha):
+    """
+    主に確認しやすい検定を1つ返す。
+    実務上のわかりやすさを優先した簡易ルール。
+    """
+    if len(x) < 2 or len(y) < 2:
+        return "Mann-Whitney U"
+
+    shapiro_ok = (
+        pd.notna(shapiro1_p) and pd.notna(shapiro2_p)
+        and shapiro1_p >= alpha and shapiro2_p >= alpha
+    )
+    levene_ok = pd.notna(levene_p) and levene_p >= alpha
+
+    if shapiro_ok and levene_ok:
+        return "Student t-test"
+    if shapiro_ok and not levene_ok:
+        return "Welch t-test"
+    return "Mann-Whitney U"
 
 
 def run_tests(x, y, alpha=0.05):
@@ -83,36 +132,109 @@ def run_tests(x, y, alpha=0.05):
 
     results = []
 
+    # 前提確認
     sx_stat, sx_p, sx_note = safe_shapiro(x)
     sy_stat, sy_p, sy_note = safe_shapiro(y)
-    add_result(results, "Shapiro-Wilk（群1）", sx_stat, sx_p, alpha, sx_note)
-    add_result(results, "Shapiro-Wilk（群2）", sy_stat, sy_p, alpha, sy_note)
+
+    add_result(
+        results, "前提確認", "Shapiro-Wilk（群1）",
+        sx_stat, sx_p, alpha, interpret_shapiro(sx_p, alpha), sx_note
+    )
+    add_result(
+        results, "前提確認", "Shapiro-Wilk（群2）",
+        sy_stat, sy_p, alpha, interpret_shapiro(sy_p, alpha), sy_note
+    )
+
+    if len(x) >= 2 and len(y) >= 2 and x.nunique() >= 2 and y.nunique() >= 2:
+        try:
+            lev = stats.levene(x, y, center="median")
+            lev_stat = float(lev.statistic)
+            lev_p = float(lev.pvalue)
+            lev_note = ""
+        except Exception as e:
+            lev_stat, lev_p, lev_note = np.nan, np.nan, f"実行不可: {e}"
+    else:
+        lev_stat, lev_p, lev_note = np.nan, np.nan, "各群 n>=2 かつ一定値のみでないことが必要"
+
+    add_result(
+        results, "前提確認", "Levene",
+        lev_stat, lev_p, alpha, interpret_levene(lev_p, alpha), lev_note
+    )
+
+    primary_test = choose_primary_test(x, y, sx_p, sy_p, lev_p, alpha)
+
+    # 群比較
+    if len(x) >= 2 and len(y) >= 2:
+        try:
+            t_student = stats.ttest_ind(
+                x, y, equal_var=True, alternative="two-sided", nan_policy="omit"
+            )
+            add_result(
+                results, "群比較", "Student t-test",
+                float(t_student.statistic), float(t_student.pvalue), alpha,
+                interpret_difference(float(t_student.pvalue), alpha),
+                primary=(primary_test == "Student t-test")
+            )
+        except Exception as e:
+            add_result(
+                results, "群比較", "Student t-test",
+                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                primary=(primary_test == "Student t-test")
+            )
+    else:
+        add_result(
+            results, "群比較", "Student t-test",
+            np.nan, np.nan, alpha, "判定不可", "各群 n>=2 が必要",
+            primary=(primary_test == "Student t-test")
+        )
 
     if len(x) >= 2 and len(y) >= 2:
-        lev = stats.levene(x, y, center="median")
-        add_result(results, "Levene", float(lev.statistic), float(lev.pvalue), alpha, "")
+        try:
+            t_welch = stats.ttest_ind(
+                x, y, equal_var=False, alternative="two-sided", nan_policy="omit"
+            )
+            add_result(
+                results, "群比較", "Welch t-test",
+                float(t_welch.statistic), float(t_welch.pvalue), alpha,
+                interpret_difference(float(t_welch.pvalue), alpha),
+                primary=(primary_test == "Welch t-test")
+            )
+        except Exception as e:
+            add_result(
+                results, "群比較", "Welch t-test",
+                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                primary=(primary_test == "Welch t-test")
+            )
     else:
-        add_result(results, "Levene", np.nan, np.nan, alpha, "各群n>=2が必要")
-
-    if len(x) >= 2 and len(y) >= 2:
-        t_student = stats.ttest_ind(x, y, equal_var=True, alternative="two-sided", nan_policy="omit")
-        add_result(results, "Student t-test", float(t_student.statistic), float(t_student.pvalue), alpha, "")
-    else:
-        add_result(results, "Student t-test", np.nan, np.nan, alpha, "各群n>=2が必要")
-
-    if len(x) >= 2 and len(y) >= 2:
-        t_welch = stats.ttest_ind(x, y, equal_var=False, alternative="two-sided", nan_policy="omit")
-        add_result(results, "Welch t-test", float(t_welch.statistic), float(t_welch.pvalue), alpha, "")
-    else:
-        add_result(results, "Welch t-test", np.nan, np.nan, alpha, "各群n>=2が必要")
+        add_result(
+            results, "群比較", "Welch t-test",
+            np.nan, np.nan, alpha, "判定不可", "各群 n>=2 が必要",
+            primary=(primary_test == "Welch t-test")
+        )
 
     if len(x) >= 1 and len(y) >= 1:
-        mw = stats.mannwhitneyu(x, y, alternative="two-sided", method="auto")
-        add_result(results, "Mann-Whitney U", float(mw.statistic), float(mw.pvalue), alpha, "")
+        try:
+            mw = stats.mannwhitneyu(x, y, alternative="two-sided", method="auto")
+            add_result(
+                results, "群比較", "Mann-Whitney U",
+                float(mw.statistic), float(mw.pvalue), alpha,
+                interpret_difference(float(mw.pvalue), alpha),
+                primary=(primary_test == "Mann-Whitney U")
+            )
+        except Exception as e:
+            add_result(
+                results, "群比較", "Mann-Whitney U",
+                np.nan, np.nan, alpha, "判定不可", f"実行不可: {e}",
+                primary=(primary_test == "Mann-Whitney U")
+            )
     else:
-        add_result(results, "Mann-Whitney U", np.nan, np.nan, alpha, "各群n>=1が必要")
+        add_result(
+            results, "群比較", "Mann-Whitney U",
+            np.nan, np.nan, alpha, "判定不可", "各群 n>=1 が必要",
+            primary=(primary_test == "Mann-Whitney U")
+        )
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(results), primary_test, sx_p, sy_p, lev_p
 
 
 st.sidebar.header("設定")
@@ -173,32 +295,54 @@ if uploaded_file is not None:
     if dropped_x > 0 or dropped_y > 0:
         st.warning(f"数値変換できない値を除外しました（群1: {dropped_x}件, 群2: {dropped_y}件）。")
 
-    st.subheader("記述統計")
-    summary_df = pd.DataFrame([summarize(x, col_x), summarize(y, col_y)])
-    st.dataframe(summary_df, use_container_width=True)
-
     if len(x) == 0 or len(y) == 0:
         st.error("どちらかの群で有効な数値データがありません。")
         st.stop()
 
+    if len(x) < 3 or len(y) < 3:
+        st.info("Shapiro-Wilk は n<3 では実行できません。少数例では正規性判断に注意してください。")
+
+    if len(x) > 5000 or len(y) > 5000:
+        st.info("n>5000 の群では Shapiro-Wilk を省略します。大標本では図示や別法も検討してください。")
+
+    if x.nunique() < 2 or y.nunique() < 2:
+        st.warning("一方または両方の群で値のばらつきがほとんどありません。検定結果の解釈に注意してください。")
+
+    st.subheader("記述統計")
+    summary_df = pd.DataFrame([summarize(x, col_x), summarize(y, col_y)])
+    st.dataframe(summary_df, use_container_width=True)
+
     st.subheader("検定結果")
-    results_df = run_tests(x, y, alpha=alpha)
+    results_df, primary_test, shapiro1, shapiro2, levene_p = run_tests(x, y, alpha=alpha)
     st.dataframe(results_df, use_container_width=True)
 
-    st.subheader("簡易メモ")
-    shapiro1 = results_df.loc[results_df["test"] == "Shapiro-Wilk（群1）", "p_value"].values[0]
-    shapiro2 = results_df.loc[results_df["test"] == "Shapiro-Wilk（群2）", "p_value"].values[0]
-    levene_p = results_df.loc[results_df["test"] == "Levene", "p_value"].values[0]
+    st.subheader("解釈メモ")
+    st.markdown(f"**主に確認しやすい検定:** `{primary_test}`")
 
-    shapiro_ok = pd.notna(shapiro1) and pd.notna(shapiro2) and shapiro1 >= alpha and shapiro2 >= alpha
+    shapiro_ok = (
+        pd.notna(shapiro1) and pd.notna(shapiro2)
+        and shapiro1 >= alpha and shapiro2 >= alpha
+    )
     levene_ok = pd.notna(levene_p) and levene_p >= alpha
 
     if shapiro_ok and levene_ok:
-        st.info("両群で正規性が大きく崩れておらず、等分散も大きく崩れていないので、Student t-test を確認しやすい状況です。")
+        st.info(
+            "両群とも正規性を棄却する十分な根拠がなく、等分散性も棄却する十分な根拠がないため、"
+            "主には Student t-test を確認しやすい状況です。"
+        )
     elif shapiro_ok and not levene_ok:
-        st.info("正規性は大きく崩れていない一方、等分散性に注意が必要なので、Welch t-test を確認しやすい状況です。")
+        st.info(
+            "両群とも正規性を棄却する十分な根拠はありませんが、等分散性は仮定しにくいため、"
+            "主には Welch t-test を確認しやすい状況です。"
+        )
     else:
-        st.info("正規性が十分でない可能性があるため、Mann-Whitney U もあわせて確認しやすい状況です。")
+        st.info(
+            "正規性を仮定しにくい可能性があるため、主には Mann-Whitney U を確認しやすい状況です。"
+        )
+
+    st.caption(
+        "※ p≥α は『差がないことの証明』ではなく、『その前提を棄却する十分な根拠が得られなかった』ことを意味します。"
+    )
 
     csv_bytes = results_df.to_csv(index=False).encode("utf-8-sig")
     st.download_button(
