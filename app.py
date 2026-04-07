@@ -4,10 +4,10 @@ import pandas as pd
 import streamlit as st
 from scipy import stats
 
-st.set_page_config(page_title="独立2群比較まとめ", layout="wide")
-st.title("独立2群比較 統計検定アプリ")
+st.set_page_config(page_title="独立2群比較 統計検定", layout="wide")
+st.title("独立2群比較 統計検定")
 st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を実行")
-st.warning("このアプリは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
+st.warning("このアプリケーションは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
 
 ALPHA_DEFAULT = 0.05
 SAMPLE_WIDE_CSV = """group_A,group_B
