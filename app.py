@@ -5,7 +5,7 @@ import streamlit as st
 from scipy import stats
 
 st.set_page_config(page_title="独立2群比較まとめ", layout="wide")
-st.title("独立2群比較 統計･検定アプリ")
+st.title("独立2群比較 統計検定アプリ")
 st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を実行")
 st.warning("このアプリは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
 
@@ -241,16 +241,15 @@ alpha = st.sidebar.selectbox(
     format_func=lambda x: f"{x:.2f}",
 )
 
-st.sidebar.download_button(
-    label="サンプルCSVをダウンロード",
-    data=SAMPLE_WIDE_CSV.encode("utf-8-sig"),
-    file_name="sample_wide.csv",
-    mime="text/csv",
-)
-
 with st.expander("CSV形式の例", expanded=True):
     st.markdown("2列以上の数値列を持つCSVをアップロードしてください。比較は2列を選択して行います。")
     st.code(SAMPLE_WIDE_CSV, language="csv")
+    st.download_button(
+        label="サンプルCSVをダウンロード",
+        data=SAMPLE_WIDE_CSV.encode("utf-8-sig"),
+        file_name="sample_wide.csv",
+        mime="text/csv",
+    )
 
 uploaded_file = st.file_uploader("CSVファイルをアップロード", type=["csv"])
 
@@ -311,6 +310,7 @@ if uploaded_file is not None:
     st.dataframe(results_df, use_container_width=True)
 
     st.subheader("解釈メモ")
+    st.markdown(f"**推奨される検定:** `{primary_test}`")
 
     shapiro_ok = (
         pd.notna(shapiro1) and pd.notna(shapiro2)
