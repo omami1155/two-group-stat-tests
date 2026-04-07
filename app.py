@@ -60,7 +60,7 @@ def add_result(results, category, test_name, statistic, pvalue, alpha, interpret
         "統計量": statistic,
         "p値": pvalue,
         "α": alpha,
-        "主に確認": "○" if primary else "",
+        "第一候補": "○" if primary else "",
         "解釈": interpretation,
         "備考": note,
     })
@@ -107,7 +107,7 @@ def interpret_difference(p, alpha):
 
 def choose_primary_test(x, y, shapiro1_p, shapiro2_p, levene_p, alpha):
     """
-    主に確認しやすい検定を1つ返す。
+    推奨される検定を1つ返す。
     実務上のわかりやすさを優先した簡易ルール。
     """
     if len(x) < 2 or len(y) < 2:
@@ -132,7 +132,6 @@ def run_tests(x, y, alpha=0.05):
 
     results = []
 
-    # 前提確認
     sx_stat, sx_p, sx_note = safe_shapiro(x)
     sy_stat, sy_p, sy_note = safe_shapiro(y)
 
@@ -163,7 +162,6 @@ def run_tests(x, y, alpha=0.05):
 
     primary_test = choose_primary_test(x, y, sx_p, sy_p, lev_p, alpha)
 
-    # 群比較
     if len(x) >= 2 and len(y) >= 2:
         try:
             t_student = stats.ttest_ind(
@@ -318,6 +316,12 @@ if uploaded_file is not None:
 
     st.subheader("解釈メモ")
     st.markdown(f"**推奨される検定:** `{primary_test}`")
+
+    shapiro_ok = (
+        pd.notna(shapiro1) and pd.notna(shapiro2)
+        and shapiro1 >= alpha and shapiro2 >= alpha
+    )
+    levene_ok = pd.notna(levene_p) and levene_p >= alpha
 
     if shapiro_ok and levene_ok:
         st.info(
