@@ -40,7 +40,7 @@ def summarize(x, name):
     q1 = x.quantile(0.25) if len(x) > 0 else np.nan
     q3 = x.quantile(0.75) if len(x) > 0 else np.nan
     return {
-        "グループ": name,
+        "群": name,
         "n数": int(x.shape[0]),
         "平均": float(x.mean()) if len(x) else np.nan,
         "標準偏差": float(x.std(ddof=1)) if len(x) >= 2 else np.nan,
