@@ -10,11 +10,11 @@ st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney
 st.warning("このアプリケーションは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
 
 ALPHA_DEFAULT = 0.05
-SAMPLE_WIDE_CSV = """group_A,group_B
-12.3,10.2
-11.8,9.8
-13.1,10.9
-12.2,11.1
+SAMPLE_WIDE_CSV = """group_A,group_B,group_C
+12.3,10.2,12.4
+11.8,9.8,11,4
+13.1,10.9,10,9
+12.2,11.1,12,1
 """
 
 def load_csv_flex(uploaded_file):
