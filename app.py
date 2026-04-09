@@ -100,8 +100,8 @@ def interpret_difference(p, alpha):
     if pd.isna(p):
         return "判定不可"
     if p < alpha:
-        return "群間差あり"
-    return "群間差を示す十分な根拠なし"
+        return "有意差あり"
+    return "有意差を示す十分な根拠なし"
 
 
 def choose_primary_test(x, y, shapiro1_p, shapiro2_p, levene_p, alpha):
