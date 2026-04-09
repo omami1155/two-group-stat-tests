@@ -310,7 +310,6 @@ if uploaded_file is not None:
     st.dataframe(results_df, use_container_width=True)
 
     st.subheader("解釈メモ")
-    st.markdown(f"**推奨される検定:** `{primary_test}`")
 
     shapiro_ok = (
         pd.notna(shapiro1) and pd.notna(shapiro2)
