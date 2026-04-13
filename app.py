@@ -2,6 +2,7 @@ import io
 import numpy as np
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
 from scipy import stats
 
 st.set_page_config(page_title="独立2群比較 統計検定", layout="wide")
@@ -304,6 +305,29 @@ if uploaded_file is not None:
     st.subheader("記述統計")
     summary_df = pd.DataFrame([summarize(x, col_x), summarize(y, col_y)])
     st.dataframe(summary_df, use_container_width=True)
+
+    st.subheader("箱ひげ図")
+    fig_box, ax_box = plt.subplots(figsize=(7, 5))
+    ax_box.boxplot([x, y], labels=[col_x, col_y])
+    ax_box.set_title("群ごとの箱ひげ図")
+    ax_box.set_xlabel("群")
+    ax_box.set_ylabel("値")
+    ax_box.grid(True, axis="y", alpha=0.3)
+    st.pyplot(fig_box)
+
+    st.subheader("QQプロット")
+    fig_qq, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    stats.probplot(x, dist="norm", plot=axes[0])
+    axes[0].set_title(f"{col_x} のQQプロット")
+    axes[0].grid(True, alpha=0.3)
+
+    stats.probplot(y, dist="norm", plot=axes[1])
+    axes[1].set_title(f"{col_y} のQQプロット")
+    axes[1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    st.pyplot(fig_qq)
 
     st.subheader("検定結果")
     results_df, primary_test, shapiro1, shapiro2, levene_p = run_tests(x, y, alpha=alpha)
