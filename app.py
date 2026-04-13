@@ -5,7 +5,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from scipy import stats
 
-st.set_page_config(page_title="独立2群比較 統計検定", layout="wide")
+st.set_page_config(page_title="独立2群比較 統計検定", layout="centered")
 st.title("独立2群比較 統計検定")
 st.caption("Shapiro-Wilk / Levene / Student t-test / Welch t-test / Mann-Whitney U を実行")
 st.warning("このアプリケーションは独立2群用です。対応のあるデータ（前後比較・同一対象の2条件比較）には使用しないでください。")
@@ -307,32 +307,46 @@ if uploaded_file is not None:
     st.dataframe(summary_df, use_container_width=True)
 
     st.subheader("箱ひげ図")
-    fig_box, ax_box = plt.subplots(figsize=(4.5, 3.2))
-    ax_box.boxplot([x, y], tick_labels=[col_x, col_y])
+    left1, center1, right1 = st.columns([1, 2, 1])
+
+    fig_box, ax_box = plt.subplots(figsize=(4.0, 3.0))
+    ax_box.boxplot([x, y], tick_labels=["", ""])
     ax_box.set_title("")
     ax_box.set_xlabel("")
     ax_box.set_ylabel("")
     ax_box.tick_params(labelsize=8)
     ax_box.grid(True, axis="y", alpha=0.3)
     plt.tight_layout()
-    st.pyplot(fig_box)
+
+    with center1:
+        st.pyplot(fig_box)
+
     plt.close(fig_box)
 
     st.subheader("QQプロット")
-    fig_qq, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
+    left2, center2, right2 = st.columns([1, 2, 1])
+
+    fig_qq, axes = plt.subplots(1, 2, figsize=(6.4, 3.0))
 
     stats.probplot(x, dist="norm", plot=axes[0])
-    axes[0].set_title(f"{col_x}", fontsize=10)
+    axes[0].set_title("")
+    axes[0].set_xlabel("")
+    axes[0].set_ylabel("")
     axes[0].tick_params(labelsize=8)
     axes[0].grid(True, alpha=0.3)
 
     stats.probplot(y, dist="norm", plot=axes[1])
-    axes[1].set_title(f"{col_y}", fontsize=10)
+    axes[1].set_title("")
+    axes[1].set_xlabel("")
+    axes[1].set_ylabel("")
     axes[1].tick_params(labelsize=8)
     axes[1].grid(True, alpha=0.3)
 
     plt.tight_layout()
-    st.pyplot(fig_qq)
+
+    with center2:
+        st.pyplot(fig_qq)
+
     plt.close(fig_qq)
 
     st.subheader("検定結果")
