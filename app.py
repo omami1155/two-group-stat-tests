@@ -310,7 +310,6 @@ if uploaded_file is not None:
     fig_box, ax_box = plt.subplots(figsize=(4.5, 3.2))
     ax_box.boxplot([x, y], tick_labels=[col_x, col_y])
     ax_box.set_title("Boxplot", fontsize=11)
-    ax_box.set_xlabel("Group", fontsize=9)
     ax_box.set_ylabel("Value", fontsize=9)
     ax_box.tick_params(labelsize=8)
     ax_box.grid(True, axis="y", alpha=0.3)
@@ -322,12 +321,12 @@ if uploaded_file is not None:
     fig_qq, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
 
     stats.probplot(x, dist="norm", plot=axes[0])
-    axes[0].set_title(f"QQ plot: {col_x}", fontsize=10)
+    axes[0].set_title(f, fontsize=10)
     axes[0].tick_params(labelsize=8)
     axes[0].grid(True, alpha=0.3)
 
     stats.probplot(y, dist="norm", plot=axes[1])
-    axes[1].set_title(f"QQ plot: {col_y}", fontsize=10)
+    axes[1].set_title(f, fontsize=10)
     axes[1].tick_params(labelsize=8)
     axes[1].grid(True, alpha=0.3)
 
